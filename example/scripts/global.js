@@ -297,6 +297,7 @@ function resetFields(whichform){
     for (var i=0; i<whichform.length; i++){
         var element = whichform.elements[i];
         if (element.type == "submit") continue;
+        // if (!element.getAttribute("placeholder")) continue;
         var check = element.placeholder || element.getAttribute("placeholder");
         if (!check) continue;
         element.onfocus = function () {
@@ -315,9 +316,17 @@ function resetFields(whichform){
         element.onblur();
     }
 }
-
+function isFilled(field) {
+    if (field.value.replace(' ','').length == 0) return false;
+    var placeholder = field.placeholder || field.getAttribute("placeholder");
+    return (field.value != placeholder);
+  // return (field.value.length > 1 && field.value != field.placeholder);
+}
+function isEmail(field){
+    return (field.value.indexOf("@") != -1 && field.value.indexOf(".") != -1);
+}
 function validataForm(whichform){
-    for (var i=0; i<whichform.length; i++){
+    for (var i=0; i<whichform.element.length; i++){
         var element = whichform.element[i];
         if (element.required == 'required'){
             if (!isFilled(element)){
@@ -325,31 +334,86 @@ function validataForm(whichform){
                 return false;
             }
         }
-        if (element.type == "email"){
-            if (!isEmail(element)){}
-            alert("The "+element.name+ " field must be a valid email address.");
-            return false;
+        if (element.type == "email") {
+            if (!isEmail(element)) {
+                alert("The " + element.name + " field must be a valid email address.");
+                return false;
+            }
         }
     }
     return true;
 }
-function isFilled(field) {
-  return (field.value.length > 1 && field.value != field.placeholder);
-}
-function isEmail(field){
-    return (field.value.indexOf("@") != 1 && field.value.indexOf(".") != 1);
-}
+
 function prepareForms() {
   for (var i=0; i<document.forms.length; i++) {
     var thisform = document.forms[i];
     resetFields(thisform);
     thisform.onsubmit = function() {
-      if (!validateForm(this)) return false;
-      var article = document.getElementsByTagName('article')[0];
-      if (submitFormWithAjax(this, article)) return false;
-      return true;
+        if (!validataForm(this)) return false;
+        var article = document.getElementsByTagName('article')[0];
+        if (submitFormWithAjax(this, article)) return false;
+        return true;
     }
   }
+}
+
+//提交表单
+function getHTTPObject(){
+    if (typeof XMLHttpRequest == "undefined"){
+        try { return new ActiveXObject("Msxml2.XMLHTTP.6.0"); }
+        catch (e) {
+        }
+        try {return new ActiveXObject("Msxml2.XMLHTTP.3.0"); }
+        catch (e) {
+        }
+        try {return new ActiveXObject("Msxml2.XMLHTTP");}
+        catch (e) {
+        }
+        return false;
+    }
+    return new XMLHttpRequest();
+}
+function displayAjaxLoading(element){
+    while (element.hasChildNodes()){
+        element.removeChild(element.lastChild);
+    }
+    var content = document.createElement("img");
+    content.setAttribute("src","/image/loading.gif");
+    content.setAttribute("alt","Loading...");
+    element.appendChild(content);
+}
+function submitFormWithAjax(whichform, thetartget){
+    var request = getHTTPObject();
+    if (!request) {return false};
+    // Display a loading message.
+    displayAjaxLoading(thetartget);
+    var dataParts = [];
+    var element;
+    for (var i=0; i<whichform.element.length; i++){
+        element = whichform.element[i];
+        dataParts[i] = element.name + "=" + encodeURIComponent(element.value);
+    }
+    var data = dataParts.join('&');
+
+    request.open('POST', whichform.getAttribute("action"), true);
+    request.setRequestHeader("Content-type", "application/x-www-form-urlencoded");
+
+    request.onreadystatechange = function () {
+        if (request.readyState == 4) {
+            if (request.status == 200 || request.status == 0) {
+              var matches = request.responseText.match(/<article>([\s\S]+)<\/article>/);
+              if (matches.length > 0) {
+                thetarget.innerHTML = matches[1];
+              } else {
+                thetarget.innerHTML = '<p>Oops, there was an error. Sorry.</p>';
+              }
+            } else {
+              thetarget.innerHTML = '<p>' + request.statusText + '</p>';
+            }
+        }
+      };
+  request.send(data);
+  return true;
 }
 
 addLoadEvent(hightlightPage)
